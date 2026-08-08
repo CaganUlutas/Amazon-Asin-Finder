@@ -14,7 +14,7 @@ from pathlib import Path
 # =============================================================================
 
 APP_NAME = "Amazon ASIN Finder"
-APP_VERSION = "1.0.0"
+APP_VERSION = "1.1.0"
 APP_AUTHOR = "ASIN Finder Team"
 
 # =============================================================================
