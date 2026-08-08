@@ -186,9 +186,6 @@ class TaskRepository:
         error_message: Optional[str] = None,
     ) -> None:
         """Update a task's status and optionally set an error message."""
-        updates = {"status": status.value}
-        params = [status.value]
-
         if status == TaskStatusEnum.RUNNING:
             await self._db.execute(
                 "UPDATE tasks SET status = ?, started_at = ? WHERE id = ?",

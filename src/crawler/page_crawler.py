@@ -67,9 +67,10 @@ class PageCrawler:
         url: str,
         task_id: str,
         url_index: int = 0,
+        start_page: int = 1,
     ) -> AsyncGenerator[tuple[CrawlProgress, list[ProductData]], None]:
         """
-        Crawl all pages of an Amazon search URL.
+        Crawl all pages of an Amazon search URL starting from start_page.
 
         Yields progress updates and product data for each page processed.
 
@@ -78,6 +79,7 @@ class PageCrawler:
             url: The Amazon search URL to crawl.
             task_id: The parent task ID (for progress tracking).
             url_index: The index of this URL in the task's URL list.
+            start_page: The page number to start/resume crawling from.
 
         Yields:
             Tuples of (CrawlProgress, list[ProductData]) for each page.
@@ -97,10 +99,11 @@ class PageCrawler:
                 self._browser_manager.release_page()
                 raise
 
-            logger.info("Tarama başlatılıyor: %s", url)
+            start_url = self._build_page_url(url, start_page) if start_page > 1 else url
+            logger.info("Tarama %s (sayfa %d): %s", "devam ettiriliyor" if start_page > 1 else "başlatılıyor", start_page, start_url)
 
-            # Navigate to the first page
-            await self._navigate_to_page(page, url)
+            # Navigate to initial page
+            await self._navigate_to_page(page, start_url)
 
             # Check for CAPTCHA
             if await ProductParser.check_captcha(page):
@@ -137,8 +140,8 @@ class PageCrawler:
             total_pages = min(total_pages, MAX_PAGES_PER_URL)
             logger.info("Toplam %d sayfa tespit edildi: %s", total_pages, url)
 
-            # Process each page
-            current_page = 1
+            # Process each page starting from start_page
+            current_page = max(1, start_page)
             while current_page <= total_pages and not self._cancelled:
                 logger.info(
                     "Sayfa %d/%d işleniyor: %s",
@@ -245,6 +248,21 @@ class PageCrawler:
                 except Exception:
                     pass
             self._browser_manager.release_page()
+
+    @staticmethod
+    def _build_page_url(url: str, page_num: int) -> str:
+        """Helper to append or update page query parameter in URL."""
+        if page_num <= 1:
+            return url
+        import urllib.parse
+        parsed = urllib.parse.urlparse(url)
+        params = urllib.parse.parse_qs(parsed.query)
+        params["page"] = [str(page_num)]
+        new_query = urllib.parse.urlencode(params, doseq=True)
+        return urllib.parse.urlunparse((
+            parsed.scheme, parsed.netloc, parsed.path,
+            parsed.params, new_query, parsed.fragment
+        ))
 
     async def _navigate_to_page(self, page: Page, url: str) -> None:
         """
