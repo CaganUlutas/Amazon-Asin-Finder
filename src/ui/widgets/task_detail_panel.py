@@ -14,7 +14,7 @@ from datetime import timedelta
 from pathlib import Path
 from typing import Optional
 
-from PySide6.QtCore import Signal, Qt
+from PySide6.QtCore import Signal, Qt, QTimer
 from PySide6.QtWidgets import (
     QWidget,
     QVBoxLayout,
@@ -57,6 +57,26 @@ class TaskDetailPanel(QWidget):
         self._current_task: Optional[TaskModel] = None
         self._export_manager = ExportManager()
         self._setup_ui()
+        
+        self._timer = QTimer(self)
+        self._timer.setInterval(1000)
+        self._timer.timeout.connect(self._on_timer_tick)
+        self._timer.start()
+
+    def _on_timer_tick(self):
+        """Update elapsed and ETA labels in real-time every second."""
+        if self._current_task and self._current_task.status == TaskStatusEnum.RUNNING:
+            elapsed = self._current_task.elapsed_seconds
+            self._stat_labels["elapsed"].setText(
+                str(timedelta(seconds=int(elapsed)))
+            )
+            eta = self._current_task.estimated_remaining_seconds
+            if eta is not None:
+                self._stat_labels["eta"].setText(
+                    str(timedelta(seconds=int(eta)))
+                )
+            else:
+                self._stat_labels["eta"].setText("—")
 
     def _setup_ui(self):
         layout = QVBoxLayout(self)
