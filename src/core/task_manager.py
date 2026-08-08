@@ -293,6 +293,7 @@ class TaskManager:
                         u.processed_pages for u in task.urls
                     )
                     task.processed_pages = total_processed_pages
+                    task.update_progress_snapshot()
 
                     # Apply filters to new products
                     if products:
