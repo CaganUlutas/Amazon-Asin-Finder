@@ -51,8 +51,8 @@ MIN_URLS_PER_TASK = 1
 # =============================================================================
 
 # Delay between page requests (seconds) — randomized within this range
-REQUEST_DELAY_MIN = 2.0
-REQUEST_DELAY_MAX = 5.0
+REQUEST_DELAY_MIN = 1.0
+REQUEST_DELAY_MAX = 3.0
 
 # Maximum concurrent pages open in browser
 MAX_CONCURRENT_PAGES = 3
