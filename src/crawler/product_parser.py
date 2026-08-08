@@ -127,36 +127,64 @@ class ProductParser:
         )
 
     @classmethod
+    @staticmethod
+    def _parse_price_string(text: str) -> Optional[float]:
+        """Helper to reliably extract numeric float price from string."""
+        if not text:
+            return None
+        text = text.strip()
+        match = re.search(r"[\$\€\£\₺]?\s*([\d,]+\.?\d*)", text)
+        if match:
+            raw = match.group(1).replace(",", "")
+            try:
+                val = float(raw)
+                return val if val > 0 else None
+            except ValueError:
+                pass
+        return None
+
+    @classmethod
     async def _extract_price(cls, element: ElementHandle) -> Optional[float]:
-        """Extract the product price from the listing element."""
+        """Extract the current actual selling price from the listing element."""
+        # 1. Try .a-price:not(.a-text-price):not([data-a-strike="true"]) .a-offscreen (excludes strike-through original prices!)
         try:
-            # Try primary price selector
-            whole_el = await element.query_selector(AmazonSelectors.PRICE_WHOLE)
-            if whole_el:
-                whole_text = await whole_el.inner_text()
-                whole_text = whole_text.strip().replace(",", "").replace(".", "")
-
-                fraction_el = await element.query_selector(
-                    AmazonSelectors.PRICE_FRACTION
-                )
-                fraction_text = "00"
-                if fraction_el:
-                    fraction_text = (await fraction_el.inner_text()).strip()
-
-                if whole_text:
-                    return float(f"{whole_text}.{fraction_text}")
-        except (ValueError, AttributeError):
+            price_els = await element.query_selector_all('.a-price:not(.a-text-price):not([data-a-strike="true"])')
+            for price_el in price_els:
+                offscreen = await price_el.query_selector(".a-offscreen")
+                if offscreen:
+                    text = await offscreen.text_content()
+                    val = cls._parse_price_string(text)
+                    if val is not None:
+                        return val
+        except Exception:
             pass
 
-        # Fallback: try to find any price-like text
+        # 2. Try .a-price:not(.a-text-price):not([data-a-strike="true"]) whole and fraction elements
         try:
-            price_el = await element.query_selector(".a-price .a-offscreen")
+            price_els = await element.query_selector_all('.a-price:not(.a-text-price):not([data-a-strike="true"])')
+            for price_el in price_els:
+                whole_el = await price_el.query_selector(".a-price-whole")
+                if whole_el:
+                    whole_text = (await whole_el.text_content() or "").strip().rstrip(".,")
+                    whole_text = re.sub(r"[^\d]", "", whole_text)
+                    fraction_el = await price_el.query_selector(".a-price-fraction")
+                    fraction_text = "00"
+                    if fraction_el:
+                        fraction_text = re.sub(r"[^\d]", "", await fraction_el.text_content() or "") or "00"
+                    if whole_text:
+                        return float(f"{whole_text}.{fraction_text}")
+        except Exception:
+            pass
+
+        # 3. Fallback: .a-color-price
+        try:
+            price_el = await element.query_selector(".a-color-price")
             if price_el:
-                price_text = await price_el.inner_text()
-                price_match = re.search(r"\$?([\d,]+\.?\d*)", price_text)
-                if price_match:
-                    return float(price_match.group(1).replace(",", ""))
-        except (ValueError, AttributeError):
+                text = await price_el.text_content()
+                val = cls._parse_price_string(text)
+                if val is not None:
+                    return val
+        except Exception:
             pass
 
         return None
@@ -165,34 +193,31 @@ class ProductParser:
     async def _extract_rating(cls, element: ElementHandle) -> Optional[float]:
         """Extract the star rating from the listing element."""
         try:
-            # Try aria-label approach (e.g., "4.5 out of 5 stars")
-            rating_el = await element.query_selector('[data-cy="reviews-ratings-count"]')
-            if rating_el:
-                text = await rating_el.inner_text()
-                match = re.search(r"([\d.]+)\s*out\s*of", text, re.IGNORECASE)
-                if match:
-                    return float(match.group(1))
-
-            # Try the icon-alt approach
-            rating_el = await element.query_selector(
-                AmazonSelectors.RATING_ALT
-            )
-            if rating_el:
-                alt_text = await rating_el.inner_text()
-                match = re.search(r"([\d.]+)\s*out\s*of", alt_text, re.IGNORECASE)
-                if match:
-                    return float(match.group(1))
-
-            # Try aria-label on the star icon link
-            star_link = await element.query_selector("a.a-link-normal [class*='a-icon-star']")
-            if star_link:
-                classes = await star_link.get_attribute("class") or ""
-                # Classes like "a-icon-star-small a-star-small-4-5"
-                match = re.search(r"a-star-(?:small-)?(\d)-(\d)", classes)
-                if match:
-                    return float(f"{match.group(1)}.{match.group(2)}")
-
-        except (ValueError, AttributeError):
+            selectors = [
+                ".a-icon-star-small .a-icon-alt",
+                ".a-icon-star .a-icon-alt",
+                "i[class*='a-icon-star']",
+                "span[aria-label*='out of 5 stars']",
+                "span[aria-label*='stars']",
+                "a[aria-label*='out of 5 stars']",
+            ]
+            for sel in selectors:
+                rel = await element.query_selector(sel)
+                if rel:
+                    text = (await rel.get_attribute("aria-label")) or (await rel.text_content() or "")
+                    match = re.search(r"([\d\.]+)\s*(?:out of|\/|stars)", text, re.IGNORECASE)
+                    if match:
+                        try:
+                            val = float(match.group(1))
+                            if 0.0 <= val <= 5.0:
+                                return val
+                        except ValueError:
+                            pass
+                    classes = (await rel.get_attribute("class")) or ""
+                    match_class = re.search(r"a-star(?:-small)?-(\d)-(\d)", classes)
+                    if match_class:
+                        return float(f"{match_class.group(1)}.{match_class.group(2)}")
+        except Exception:
             pass
 
         return None
@@ -203,28 +228,27 @@ class ProductParser:
     ) -> Optional[int]:
         """Extract the number of reviews from the listing element."""
         try:
-            # Try the reviews block
-            reviews_el = await element.query_selector(
-                'a[href*="customerReviews"] span.a-size-base'
-            )
-            if reviews_el:
-                text = await reviews_el.inner_text()
-                # Remove commas and non-numeric chars: "1,234" -> 1234
-                cleaned = re.sub(r"[^\d]", "", text)
-                if cleaned:
-                    return int(cleaned)
-
-            # Fallback: look for the review count near the star rating
-            review_els = await element.query_selector_all(
-                AmazonSelectors.REVIEW_COUNT_ALT
-            )
-            for rel in review_els:
-                text = await rel.inner_text()
-                cleaned = re.sub(r"[^\d]", "", text)
-                if cleaned and int(cleaned) > 0:
-                    return int(cleaned)
-
-        except (ValueError, AttributeError):
+            selectors = [
+                'a[href*="customerReviews"] span',
+                'a[href*="customerReviews"]',
+                '.a-size-base.s-underline-text',
+                '[data-cy="reviews-ratings-count"]',
+                'span.a-size-base[aria-label*="ratings"]',
+            ]
+            for sel in selectors:
+                rev_el = await element.query_selector(sel)
+                if rev_el:
+                    text = (await rev_el.text_content() or "") or (await rev_el.get_attribute("aria-label")) or ""
+                    text = text.replace(",", "").strip()
+                    k_match = re.search(r"([\d\.]+)\s*[kK]", text)
+                    if k_match:
+                        return int(float(k_match.group(1)) * 1000)
+                    cleaned = re.sub(r"[^\d]", "", text)
+                    if cleaned:
+                        val = int(cleaned)
+                        if val > 0:
+                            return val
+        except Exception:
             pass
 
         return None

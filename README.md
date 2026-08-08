@@ -1,6 +1,6 @@
 # Amazon ASIN Finder
 
-Profesyonel seviyede çalışan bir Amazon ASIN Crawler masaüstü uygulaması.
+Profesyonel seviyede çalışan bir Amazon ASIN Finder masaüstü uygulaması.
 
 ## Özellikler
 

@@ -159,6 +159,13 @@ class BrowserManager:
             java_script_enabled=True,
         )
 
+        # Force Amazon to use USD, US locale, and US delivery location to prevent currency mismatch and missing prices
+        await context.add_cookies([
+            {"name": "i18n-prefs", "value": "USD", "domain": ".amazon.com", "path": "/"},
+            {"name": "lc-main", "value": "en_US", "domain": ".amazon.com", "path": "/"},
+            {"name": "sp-cdn", "value": "L5Z9:US", "domain": ".amazon.com", "path": "/"}
+        ])
+
         # Block unnecessary resource types to save bandwidth and memory
         await context.route(
             "**/*",

@@ -399,9 +399,8 @@ class TaskDetailPanel(QWidget):
             TaskStatusEnum.FAILED,
             TaskStatusEnum.CANCELLED,
         )
-
         self._cancel_btn.setVisible(is_running)
-        self._delete_btn.setVisible(not is_running)
+        self._delete_btn.setVisible(is_done or task.status == TaskStatusEnum.WAITING)
         self._export_txt_btn.setVisible(is_done and task.matched_asins > 0)
         self._export_csv_btn.setVisible(is_done and task.matched_asins > 0)
 

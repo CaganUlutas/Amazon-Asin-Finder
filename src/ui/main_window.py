@@ -284,11 +284,9 @@ class MainWindow(QMainWindow):
         logger.error("Görev hatası [%s]: %s", task_id[:8], error_message)
 
     def _update_elapsed_time(self):
-        """Timer callback to update real-time elapsed time & countdown ETA displays."""
+        """Timer callback to update elapsed time display."""
         if self._current_task and self._current_task.status == TaskStatusEnum.RUNNING:
-            self._detail_panel.update_task(self._current_task)
             self._update_progress_bar(self._current_task)
-            self._sidebar.update_task(self._current_task)
 
     def _update_progress_bar(self, task: TaskModel):
         """Update the bottom progress bar with task data."""

@@ -202,23 +202,6 @@ class TaskManager:
             )
             logger.info("Görev iptal edildi: %s", task_id[:8])
 
-    async def cancel_task(self, task_id: str) -> None:
-        """Cancel a running task."""
-        crawler = self._active_crawlers.get(task_id)
-        if crawler:
-            crawler.cancel()
-
-        task = self._tasks.get(task_id)
-        if task and task.status == TaskStatusEnum.RUNNING:
-            task.status = TaskStatusEnum.CANCELLED
-            await self._repo.update_task_status(
-                task_id, TaskStatusEnum.CANCELLED
-            )
-            self._signals.task_status_changed.emit(
-                task_id, TaskStatusEnum.CANCELLED.value
-            )
-            logger.info("Görev iptal edildi: %s", task_id[:8])
-
     async def delete_task(self, task_id: str) -> None:
         """Delete a task and all its data."""
         # Cancel if running
@@ -274,20 +257,15 @@ class TaskManager:
         # Initialize filter engine
         filter_engine = FilterEngine(task.filters)
 
-        all_asins: list[str] = list(task.asins)
-        total_products = task.total_products
-        total_processed_pages = task.processed_pages
-        total_pages = task.total_pages
+        all_asins: list[str] = []
+        total_products = 0
+        total_processed_pages = 0
+        total_pages = 0
 
         try:
             for url_index, url_model in enumerate(task.urls):
                 if task.status == TaskStatusEnum.CANCELLED:
                     break
-
-                if url_model.status == UrlStatusEnum.COMPLETED:
-                    continue
-
-                start_page = url_model.processed_pages + 1
 
                 # Update URL status
                 url_model.status = UrlStatusEnum.RUNNING
@@ -301,7 +279,7 @@ class TaskManager:
 
                 # Crawl this URL
                 async for progress, products in crawler.crawl_url(
-                    context, url_model.url, task.id, url_index, start_page=start_page
+                    context, url_model.url, task.id, url_index
                 ):
                     # Update total pages on first progress
                     if progress.total_pages > 0 and url_model.page_count == 0:
@@ -315,7 +293,6 @@ class TaskManager:
                         u.processed_pages for u in task.urls
                     )
                     task.processed_pages = total_processed_pages
-                    task.update_progress_snapshot()
 
                     # Apply filters to new products
                     if products:

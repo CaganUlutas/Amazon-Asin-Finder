@@ -138,8 +138,6 @@ class TaskModel:
     urls: list[TaskUrlModel] = field(default_factory=list)
     filters: FilterModel = field(default_factory=FilterModel)
     asins: list[str] = field(default_factory=list)
-    last_progress_at: Optional[datetime] = None
-    eta_at_last_progress: Optional[float] = None
 
     @property
     def progress_percent(self) -> float:
@@ -156,38 +154,17 @@ class TaskModel:
         end = self.completed_at or datetime.now()
         return (end - self.started_at).total_seconds()
 
-    def update_progress_snapshot(self) -> None:
-        """Update rate and ETA snapshot when progress is updated."""
-        if self.processed_pages > 0 and self.started_at:
-            now = datetime.now()
-            elapsed = (now - self.started_at).total_seconds()
-            if elapsed > 0:
-                rate = self.processed_pages / elapsed
-                remaining_pages = max(0, self.total_pages - self.processed_pages)
-                if rate > 0 and remaining_pages > 0:
-                    self.eta_at_last_progress = remaining_pages / rate
-                    self.last_progress_at = now
-                else:
-                    self.eta_at_last_progress = 0.0
-                    self.last_progress_at = now
-
     @property
     def estimated_remaining_seconds(self) -> Optional[float]:
-        """Estimate remaining time counting down in real-time."""
-        if self.status != TaskStatusEnum.RUNNING:
-            return None
+        """Estimate remaining time based on current progress rate."""
         if self.processed_pages <= 0 or self.started_at is None:
             return None
-
-        if self.last_progress_at is None or self.eta_at_last_progress is None:
-            self.update_progress_snapshot()
-
-        if self.eta_at_last_progress is None or self.last_progress_at is None:
+        elapsed = self.elapsed_seconds
+        rate = self.processed_pages / elapsed  # pages per second
+        remaining_pages = self.total_pages - self.processed_pages
+        if rate <= 0:
             return None
-
-        since_last = (datetime.now() - self.last_progress_at).total_seconds()
-        remaining = self.eta_at_last_progress - since_last
-        return max(0.0, remaining)
+        return remaining_pages / rate
 
     @property
     def display_name(self) -> str:

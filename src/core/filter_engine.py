@@ -83,9 +83,8 @@ class FilterEngine:
         if not self._filters.has_price_filter():
             return True
 
-        # If product has no price data, we can't filter on it — skip
         if product.price is None:
-            return True
+            return False
 
         if self._filters.min_price is not None:
             if product.price < self._filters.min_price:
@@ -103,7 +102,7 @@ class FilterEngine:
             return True
 
         if product.rating is None:
-            return True
+            return False
 
         if self._filters.min_rating is not None:
             if product.rating < self._filters.min_rating:
@@ -121,7 +120,7 @@ class FilterEngine:
             return True
 
         if product.review_count is None:
-            return True
+            return False
 
         if self._filters.min_reviews is not None:
             if product.review_count < self._filters.min_reviews:
@@ -150,13 +149,21 @@ class FilterEngine:
         if not self._filters.excluded_brands:
             return True
 
-        if product.brand is None:
+        excluded_lower = [b.lower().strip() for b in self._filters.excluded_brands if b.strip()]
+        if not excluded_lower:
             return True
 
-        product_brand_lower = product.brand.lower().strip()
-        excluded_lower = [b.lower().strip() for b in self._filters.excluded_brands]
+        if product.brand:
+            p_brand = product.brand.lower().strip()
+            if any(eb in p_brand for eb in excluded_lower):
+                return False
 
-        return product_brand_lower not in excluded_lower
+        if product.title:
+            p_title = product.title.lower().strip()
+            if any(eb in p_title for eb in excluded_lower):
+                return False
+
+        return True
 
     def _check_keywords(self, product: ProductData) -> bool:
         """
