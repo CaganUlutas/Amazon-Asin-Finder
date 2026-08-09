@@ -267,6 +267,10 @@ class TaskDetailPanel(QWidget):
 
         action_layout.addStretch()
 
+        self._copy_btn = QPushButton("Kopyala")
+        self._copy_btn.clicked.connect(self._on_copy_clicked)
+        action_layout.addWidget(self._copy_btn)
+
         self._export_txt_btn = QPushButton("TXT Olarak Kaydet")
         self._export_txt_btn.setObjectName("successButton")
         self._export_txt_btn.clicked.connect(lambda: self._on_export("txt"))
@@ -423,6 +427,7 @@ class TaskDetailPanel(QWidget):
         self._delete_btn.setVisible(is_done or task.status == TaskStatusEnum.WAITING)
         self._export_txt_btn.setVisible(is_done and task.matched_asins > 0)
         self._export_csv_btn.setVisible(is_done and task.matched_asins > 0)
+        self._copy_btn.setVisible(is_done and task.matched_asins > 0)
 
         # Load ASINs for current task
         if task.asins:
@@ -462,6 +467,21 @@ class TaskDetailPanel(QWidget):
         """Handle delete button click."""
         if self._current_task:
             self.delete_task_requested.emit(self._current_task.id)
+
+    def _on_copy_clicked(self):
+        """Copy ASINs to clipboard."""
+        if not self._current_task or not self._current_task.asins:
+            return
+            
+        from PySide6.QtWidgets import QApplication
+        from PySide6.QtCore import QTimer
+        
+        asins_text = "\n".join(self._current_task.asins)
+        QApplication.clipboard().setText(asins_text)
+        
+        original_text = self._copy_btn.text()
+        self._copy_btn.setText("Kopyalandı!")
+        QTimer.singleShot(1500, lambda: self._copy_btn.setText(original_text))
 
     def _on_export(self, format_type: str):
         """Handle export button clicks."""

@@ -187,6 +187,19 @@ class ProductParser:
         except Exception:
             pass
 
+        # 4. Fallback for "No featured offers" (Buy Box hidden)
+        try:
+            secondary_el = await element.query_selector('[data-cy="secondary-offer-recipe"]')
+            if secondary_el:
+                text = await secondary_el.inner_text()
+                match = re.search(r"[\$\€\£\₺]\s*([\d,]+\.?\d*)", text)
+                if match:
+                    val = cls._parse_price_string(match.group(0))
+                    if val is not None:
+                        return val
+        except Exception:
+            pass
+
         return None
 
     @classmethod
