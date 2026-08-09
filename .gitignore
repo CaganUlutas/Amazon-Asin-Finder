@@ -27,3 +27,5 @@ dist/
 .vscode/
 .idea/
 *.swp
+data/*.db-shm
+data/*.db-wal
