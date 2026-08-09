@@ -37,7 +37,7 @@ def build():
         "PyInstaller",
         "--noconsole",
         "--onefile",
-        "--name=Amazon_ASIN_Finder",
+        "--name=Amazon_ASIN_Finder_v1.2.0",
         *add_data_args,
         str(project_root / "main.py"),
     ]
