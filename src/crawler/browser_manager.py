@@ -201,7 +201,13 @@ class BrowserManager:
         await self._semaphore.acquire()
         try:
             page = await context.new_page()
-            logger.debug("Yeni sayfa oluşturuldu.")
+            try:
+                from playwright_stealth import Stealth
+                await Stealth().apply_stealth_async(page)
+            except ImportError:
+                logger.warning("playwright-stealth yüklü değil, normal devam ediliyor.")
+                
+            logger.debug("Yeni sayfa oluşturuldu ve stealth uygulandı.")
             return page
         except Exception:
             self._semaphore.release()

@@ -28,6 +28,7 @@ from src.crawler.page_crawler import PageCrawler
 from src.database.db_manager import DatabaseManager
 from src.database.repositories import TaskRepository
 from src.utils.logger import get_logger
+from src.utils.url_utils import split_url_by_price
 
 logger = get_logger(__name__)
 
@@ -119,15 +120,17 @@ class TaskManager:
             filters=filters,
         )
 
-        # Create URL models
-        for url in urls:
-            task.urls.append(
-                TaskUrlModel(
-                    task_id=task.id,
-                    url=url.strip(),
-                    status=UrlStatusEnum.WAITING,
+        # Create URL models by splitting them for Smart Crawl
+        for raw_url in urls:
+            split_urls = split_url_by_price(raw_url.strip())
+            for url in split_urls:
+                task.urls.append(
+                    TaskUrlModel(
+                        task_id=task.id,
+                        url=url,
+                        status=UrlStatusEnum.WAITING,
+                    )
                 )
-            )
 
         # Persist to database
         await self._repo.create_task(task)
