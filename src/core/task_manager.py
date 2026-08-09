@@ -368,6 +368,14 @@ class TaskManager:
                             if progress.status == TaskStatusEnum.COMPLETED
                             else UrlStatusEnum.FAILED
                         )
+                        
+                        # Adjust total pages if URL finished earlier than estimated
+                        if progress.status == TaskStatusEnum.COMPLETED:
+                            diff = url_model.page_count - url_model.processed_pages
+                            if diff > 0:
+                                url_model.page_count = url_model.processed_pages
+                                total_pages -= diff
+                                task.total_pages = total_pages
 
             # Task completed
             if task.status != TaskStatusEnum.CANCELLED:

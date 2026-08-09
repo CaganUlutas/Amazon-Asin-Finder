@@ -296,14 +296,13 @@ class PageCrawler:
             if is_disabled == "true":
                 return False
 
-            # Click the next button
-            await next_button.click()
-
-            # Wait for the new page content to load
-            await page.wait_for_selector(
-                AmazonSelectors.SEARCH_RESULT,
-                timeout=15000,
-            )
+            # Click the next button and wait for navigation
+            try:
+                async with page.expect_navigation(timeout=10000):
+                    await next_button.click()
+            except PlaywrightTimeout:
+                # If it times out, it might be an AJAX update without pushState
+                await page.wait_for_timeout(3000)
 
             # Small wait for dynamic content
             await page.wait_for_load_state("domcontentloaded")

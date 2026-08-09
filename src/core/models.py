@@ -173,8 +173,7 @@ class TaskModel:
             first_url = self.urls[0].url
             name = self._extract_name_from_url(first_url)
             if name:
-                suffix = f" (+{len(self.urls) - 1})" if len(self.urls) > 1 else ""
-                return f"{name}{suffix}"
+                return name
         return f"Task {self.id[:8]}"
 
     @staticmethod
